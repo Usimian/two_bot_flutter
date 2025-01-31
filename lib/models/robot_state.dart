@@ -33,4 +33,37 @@ class RobotState extends ChangeNotifier {
     targetPosition = newPosition;
     notifyListeners();
   }
+
+  void updateParameter(String label, double value) {
+    switch (label) {
+      case 'Rp':
+        rp = value;
+        break;
+      case 'Ri':
+        ri = value;
+        break;
+      case 'Rd':
+        rd = value;
+        break;
+      case 'Kp':
+        kp = value;
+        break;
+      case 'Ki':
+        ki = value;
+        break;
+      case 'Kd':
+        kd = value;
+        break;
+      case 'Kp2':
+        kp2 = value;
+        break;
+      case 'Ki2':
+        ki2 = value;
+        break;
+      case 'Kd2':
+        kd2 = value;
+        break;
+    }
+    notifyListeners();
+  }
 }

@@ -267,7 +267,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: ParameterDisplay(),
+                  child: ParameterDisplay(mqttClient: mqttClient),
                 ),
               ),
             ),
