@@ -5,11 +5,25 @@ import 'package:mqtt_client/mqtt_client.dart';
 import 'dart:convert';
 import 'package:logging/logging.dart';
 
-class PositionControl extends StatelessWidget {
+class PositionControl extends StatefulWidget {
   final MqttClient mqttClient;
-  final _logger = Logger('PositionControl');
 
-  PositionControl({super.key, required this.mqttClient});
+  const PositionControl({super.key, required this.mqttClient});
+
+  @override
+  State<PositionControl> createState() => _PositionControlState();
+}
+
+class _PositionControlState extends State<PositionControl> {
+  final _logger = Logger('PositionControl');
+  
+  // PID state variables
+  double _kp = 2.0;
+  double _ki = 0.5;
+  double _kd = 1.0;
+  double _kp2 = 2.0;
+  double _ki2 = 0.5;
+  double _kd2 = 1.0;
 
   @override
   Widget build(BuildContext context) {
@@ -31,15 +45,15 @@ class PositionControl extends StatelessWidget {
                     onChanged: (value) {
                       final roundedValue = value.round();
                       robotState.setTargetPosition(roundedValue.toDouble());
-                      if (mqttClient.connectionStatus?.state == MqttConnectionState.connected) {
+                      if (widget.mqttClient.connectionStatus?.state == MqttConnectionState.connected) {
                         final builder = MqttClientPayloadBuilder();
                         final message = {
                           'command': 'set_position',
                           'position': roundedValue,
-                          'timestamp': DateTime.now().toIso8601String()
+                          // 'timestamp': DateTime.now().toIso8601String()
                         };
                         builder.addString(jsonEncode(message));
-                        mqttClient.publishMessage('two_bot/control_topic', MqttQos.atMostOnce, builder.payload!);
+                        widget.mqttClient.publishMessage('two_bot/control_topic', MqttQos.atMostOnce, builder.payload!);
                         _logger.fine('Published position update: $roundedValue');
                       } else {
                         _logger.warning('Cannot publish position: MQTT client not connected');
@@ -51,7 +65,7 @@ class PositionControl extends StatelessWidget {
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      'Target: ${robotState.targetPosition.round()}mm',
+                      'Target: ${robotState.targetPosition.round()} mm',
                     ),
                   ),
                 ),
@@ -59,7 +73,7 @@ class PositionControl extends StatelessWidget {
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      'Current: ${robotState.pos.round()}mm',
+                      'Current: ${robotState.pos.round()} mm',
                     ),
                   ),
                 ),
@@ -67,15 +81,15 @@ class PositionControl extends StatelessWidget {
                 ElevatedButton(
                   onPressed: () {
                     robotState.setTargetPosition(0);
-                    if (mqttClient.connectionStatus?.state == MqttConnectionState.connected) {
+                    if (widget.mqttClient.connectionStatus?.state == MqttConnectionState.connected) {
                       final builder = MqttClientPayloadBuilder();
                       final message = {
                         'command': 'set_position',
                         'position': 0,
-                        'timestamp': DateTime.now().toIso8601String()
+                        // 'timestamp': DateTime.now().toIso8601String()
                       };
                       builder.addString(jsonEncode(message));
-                      mqttClient.publishMessage('two_bot/control_topic', MqttQos.atMostOnce, builder.payload!);
+                      widget.mqttClient.publishMessage('two_bot/control_topic', MqttQos.atMostOnce, builder.payload!);
                       _logger.fine('Published reset position command');
                     } else {
                       _logger.warning('Cannot reset position: MQTT client not connected');
@@ -112,14 +126,228 @@ class PositionControl extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   controlsRow,
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          const Text('PID Control', style: TextStyle(fontSize: 18)),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    _buildPidSlider(
+                                      label: "KP",
+                                      value: _kp,
+                                      onChanged: (value) {
+                                        setState(() => _kp = value);
+                                        _sendPidUpdate('kp', value);
+                                      },
+                                    ),
+                                    _buildPidSlider(
+                                      label: "KI",
+                                      value: _ki,
+                                      onChanged: (value) {
+                                        setState(() => _ki = value);
+                                        _sendPidUpdate('ki', value);
+                                      },
+                                    ),
+                                    _buildPidSlider(
+                                      label: "KD",
+                                      value: _kd,
+                                      onChanged: (value) {
+                                        setState(() => _kd = value);
+                                        _sendPidUpdate('kd', value);
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 20),
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    _buildPidSlider(
+                                      label: "KP2",
+                                      value: _kp2,
+                                      onChanged: (value) {
+                                        setState(() => _kp2 = value);
+                                        _sendPidUpdate('kp2', value);
+                                      },
+                                    ),
+                                    _buildPidSlider(
+                                      label: "KI2",
+                                      value: _ki2,
+                                      onChanged: (value) {
+                                        setState(() => _ki2 = value);
+                                        _sendPidUpdate('ki2', value);
+                                      },
+                                    ),
+                                    _buildPidSlider(
+                                      label: "KD2",
+                                      value: _kd2,
+                                      onChanged: (value) {
+                                        setState(() => _kd2 = value);
+                                        _sendPidUpdate('kd2', value);
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               );
             }
 
-            return controlsRow;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                controlsRow,
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        const Text('PID Control', style: TextStyle(fontSize: 18)),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  _buildPidSlider(
+                                    label: "KP",
+                                    value: _kp,
+                                    onChanged: (value) {
+                                      setState(() => _kp = value);
+                                      _sendPidUpdate('kp', value);
+                                    },
+                                  ),
+                                  _buildPidSlider(
+                                    label: "KI",
+                                    value: _ki,
+                                    onChanged: (value) {
+                                      setState(() => _ki = value);
+                                      _sendPidUpdate('ki', value);
+                                    },
+                                  ),
+                                  _buildPidSlider(
+                                    label: "KD",
+                                    value: _kd,
+                                    onChanged: (value) {
+                                      setState(() => _kd = value);
+                                      _sendPidUpdate('kd', value);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  _buildPidSlider(
+                                    label: "KP2",
+                                    value: _kp2,
+                                    onChanged: (value) {
+                                      setState(() => _kp2 = value);
+                                      _sendPidUpdate('kp2', value);
+                                    },
+                                  ),
+                                  _buildPidSlider(
+                                    label: "KI2",
+                                    value: _ki2,
+                                    onChanged: (value) {
+                                      setState(() => _ki2 = value);
+                                      _sendPidUpdate('ki2', value);
+                                    },
+                                  ),
+                                  _buildPidSlider(
+                                    label: "KD2",
+                                    value: _kd2,
+                                    onChanged: (value) {
+                                      setState(() => _kd2 = value);
+                                      _sendPidUpdate('kd2', value);
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
           },
         );
       },
     );
+  }
+
+  Widget _buildPidSlider({
+    required String label,
+    required double value,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 40,
+            child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          Expanded(
+            child: Slider(
+              value: value,
+              min: 0.0,
+              max: 5.0,
+              divisions: 50,
+              label: value.toStringAsFixed(2),
+              onChanged: (double newValue) {
+                onChanged(newValue);
+              },
+            ),
+          ),
+          SizedBox(
+            width: 50,
+            child: Text(
+              value.toStringAsFixed(2),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _sendPidUpdate(String parameter, double value) {
+    if (widget.mqttClient.connectionStatus?.state == MqttConnectionState.connected) {
+      final builder = MqttClientPayloadBuilder();
+      final message = {
+        'command': 'pid_update',
+        'parameter': parameter,
+        'value': value,
+      };
+      builder.addString(jsonEncode(message));
+      widget.mqttClient.publishMessage(
+        'two_bot/control_topic',
+        MqttQos.atLeastOnce,
+        builder.payload!,
+      );
+      _logger.fine('Published PID update: $parameter = $value');
+    } else {
+      _logger.warning('Cannot update PID: MQTT client not connected');
+    }
   }
 }

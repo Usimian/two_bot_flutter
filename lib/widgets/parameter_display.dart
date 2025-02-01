@@ -32,12 +32,6 @@ class ParameterDisplay extends StatelessWidget {
                 _buildParameterTile(context, 'Rp', robotState.rp),
                 _buildParameterTile(context, 'Ri', robotState.ri),
                 _buildParameterTile(context, 'Rd', robotState.rd),
-                _buildParameterTile(context, 'Kp', robotState.kp),
-                _buildParameterTile(context, 'Ki', robotState.ki),
-                _buildParameterTile(context, 'Kd', robotState.kd),
-                _buildParameterTile(context, 'Kp2', robotState.kp2),
-                _buildParameterTile(context, 'Ki2', robotState.ki2),
-                _buildParameterTile(context, 'Kd2', robotState.kd2),
               ],
             );
           }
@@ -47,81 +41,71 @@ class ParameterDisplay extends StatelessWidget {
   }
 
   Widget _buildParameterTile(BuildContext context, String label, double value) {
-    // Only make PID parameters clickable
-    final bool isClickable = ['Kp', 'Ki', 'Kd', 'Kp2', 'Ki2', 'Kd2'].contains(label);
-
-    Widget content = Card(
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: isClickable ? Theme.of(context).primaryColor : null,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value.toStringAsFixed(2),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (isClickable) {
-      return InkWell(
-        onTap: () => _showParameterDialog(context, label, value),
-        child: content,
-      );
+    // Only show Rp, Ri, Rd parameters
+    if (['Kp', 'Ki', 'Kd', 'Kp2', 'Ki2', 'Kd2'].contains(label)) {
+      return const SizedBox.shrink(); // Don't show PID parameters
     }
 
-    return content;
-  }
-
-  Future<void> _showParameterDialog(BuildContext context, String label, double currentValue) async {
-    final TextEditingController controller = TextEditingController(
-      text: currentValue.toString(),
-    );
-
-    return showDialog<void>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Set $label'),
-          content: TextField(
-            controller: controller,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: label,
-              hintText: 'Enter new value',
-            ),
-            autofocus: true,
-          ),
-          actions: <Widget>[
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label),
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                final newValue = double.tryParse(controller.text);
-                if (newValue != null) {
-                  _updateParameter(context, label, newValue);
+              onPressed: () async {
+                if (!context.mounted) return;  
+                final result = await showDialog<double>(
+                  context: context,
+                  builder: (BuildContext dialogContext) => AlertDialog(
+                    title: Text('Update $label'),
+                    content: TextFormField(
+                      initialValue: value.toString(),
+                      keyboardType: TextInputType.number,
+                      onChanged: (value) {
+                        // Handle validation if needed
+                      },
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(dialogContext);
+                        },
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          final renderBox = dialogContext.findRenderObject() as RenderBox?;
+                          if (renderBox != null && renderBox.parent != null) {
+                            final parentBox = renderBox.parent;
+                            if (parentBox != null) {
+                              final newValue = double.tryParse(
+                                  parentBox.toString() // or use appropriate method to get the value
+                              );
+                              if (newValue != null) {
+                                Navigator.pop(dialogContext, newValue);
+                              }
+                            }
+                          }
+                        },
+                        child: const Text('Save'),
+                      ),
+                    ],
+                  ),
+                );
+                
+                if (result != null && context.mounted) {  
+                  _updateParameter(context, label, result);
                 }
-                Navigator.of(context).pop();
               },
-              child: const Text('OK'),
+              child: Text(
+                value.toStringAsFixed(2),
+              ),
             ),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 
