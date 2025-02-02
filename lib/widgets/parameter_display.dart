@@ -52,7 +52,7 @@ class ParameterDisplay extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
             TextButton(
               onPressed: () async {
                 if (!context.mounted) return;  
@@ -101,6 +101,10 @@ class ParameterDisplay extends StatelessWidget {
               },
               child: Text(
                 value.toStringAsFixed(2),
+                style: const TextStyle(
+                  fontSize: 18.0,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
