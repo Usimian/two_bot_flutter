@@ -70,6 +70,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late MqttServerClient mqttClient;
   final _logger = Logger('DashboardScreen');
   bool _mqttConnected = false;
+  bool _robotRunning = false;
+  Timer? _connectionCheckTimer;
+  Timer? _statusCheckTimer;
+  Timer? _statusTimeoutTimer;
 
   @override
   void initState() {
@@ -86,9 +90,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
         });
       }
     });
+
+    // Start periodic status check
+    _statusCheckTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      if (mounted && _mqttConnected) {
+        _requestRobotStatus();
+      }
+    });
   }
 
-  Timer? _connectionCheckTimer;
+  void _requestRobotStatus() {
+    final builder = MqttClientPayloadBuilder();
+    builder.addString('status_request');
+    mqttClient.publishMessage(
+      'two_bot/status',
+      MqttQos.atMostOnce,
+      builder.payload!,
+    );
+
+    // Cancel any existing timeout timer
+    _statusTimeoutTimer?.cancel();
+    
+    // Start a new timeout timer
+    _statusTimeoutTimer = Timer(const Duration(seconds: 1), () {
+      if (mounted) {
+        setState(() {
+          _robotRunning = false;  // Set to stopped if no response received
+        });
+      }
+    });
+  }
 
   Future<void> _setupMqttClient() async {
     mqttClient = MqttServerClient(mqttServerIp, 'two_bot_client_${DateTime.now().millisecondsSinceEpoch}');
@@ -221,11 +252,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       _mqttConnected = true;
     });
+
+    // Subscribe to response topic
+    const statusTopic = 'two_bot/response';
+    mqttClient.subscribe(statusTopic, MqttQos.atMostOnce);
+
+    // Set up message handler for status updates
+    mqttClient.updates!.listen((List<MqttReceivedMessage<MqttMessage>> c) {
+      final MqttPublishMessage message = c[0].payload as MqttPublishMessage;
+      final payload = MqttPublishPayload.bytesToStringAsString(message.payload.message);
+      
+      if (c[0].topic == 'two_bot/response') {
+        // Cancel the timeout timer since we received a response
+        _statusTimeoutTimer?.cancel();
+        
+        final status = int.tryParse(payload);
+        if (status != null) {
+          setState(() {
+            _robotRunning = status != 0;  // 0 is stopped, any other value is running
+          });
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
     _connectionCheckTimer?.cancel();
+    _statusCheckTimer?.cancel();
+    _statusTimeoutTimer?.cancel();
     tcpClient.disconnect();
     mqttClient.disconnect();
     super.dispose();
@@ -249,6 +304,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(_mqttConnected ? 'Connected' : 'Disconnected'),
+                const SizedBox(width: 16),
+                Icon(
+                  Icons.play_circle,
+                  color: _robotRunning ? Colors.green : Colors.grey,
+                  size: 12,
+                ),
+                const SizedBox(width: 8),
+                Text(_robotRunning ? 'Running' : 'Stopped'),
                 const SizedBox(width: 16),
               ],
             ),

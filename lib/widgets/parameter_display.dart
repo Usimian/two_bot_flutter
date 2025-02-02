@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 import '../models/robot_state.dart';
 
@@ -52,85 +50,20 @@ class ParameterDisplay extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-            TextButton(
-              onPressed: () async {
-                if (!context.mounted) return;  
-                final result = await showDialog<double>(
-                  context: context,
-                  builder: (BuildContext dialogContext) => AlertDialog(
-                    title: Text('Update $label'),
-                    content: TextFormField(
-                      initialValue: value.toString(),
-                      keyboardType: TextInputType.number,
-                      onChanged: (value) {
-                        // Handle validation if needed
-                      },
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(dialogContext);
-                        },
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          final renderBox = dialogContext.findRenderObject() as RenderBox?;
-                          if (renderBox != null && renderBox.parent != null) {
-                            final parentBox = renderBox.parent;
-                            if (parentBox != null) {
-                              final newValue = double.tryParse(
-                                  parentBox.toString() // or use appropriate method to get the value
-                              );
-                              if (newValue != null) {
-                                Navigator.pop(dialogContext, newValue);
-                              }
-                            }
-                          }
-                        },
-                        child: const Text('Save'),
-                      ),
-                    ],
-                  ),
-                );
-                
-                if (result != null && context.mounted) {  
-                  _updateParameter(context, label, result);
-                }
-              },
-              child: Text(
-                value.toStringAsFixed(2),
-                style: const TextStyle(
-                  fontSize: 18.0,
-                  fontWeight: FontWeight.bold,
-                ),
+            Text(label, style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 18.0,
+            )),
+            Text(
+              value.toStringAsFixed(2),
+              style: const TextStyle(
+                fontSize: 18.0,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  void _updateParameter(BuildContext context, String label, double value) {
-    final robotState = context.read<RobotState>();
-    robotState.updateParameter(label, value);
-
-    // Send the update via MQTT
-    if (mqttClient.connectionStatus?.state == MqttConnectionState.connected) {
-      final builder = MqttClientPayloadBuilder();
-      final message = {
-        'command': 'update_parameter',
-        'parameter': label,
-        'value': value,
-      };
-      builder.addString(jsonEncode(message));
-      mqttClient.publishMessage(
-        'two_bot/control_topic',
-        MqttQos.atMostOnce,
-        builder.payload!,
-      );
-    }
   }
 }
