@@ -4,6 +4,7 @@ import '../models/robot_state.dart';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'dart:convert';
 import 'package:logging/logging.dart';
+import '../main.dart' show kMqttTopicControlRequest;
 
 class PositionControl extends StatefulWidget {
   final MqttClient mqttClient;
@@ -53,7 +54,7 @@ class _PositionControlState extends State<PositionControl> {
                           // 'timestamp': DateTime.now().toIso8601String()
                         };
                         builder.addString(jsonEncode(message));
-                        widget.mqttClient.publishMessage('two_bot/control_topic', MqttQos.atMostOnce, builder.payload!);
+                        widget.mqttClient.publishMessage(kMqttTopicControlRequest, MqttQos.atMostOnce, builder.payload!);
                         _logger.fine('Published position update: $roundedValue');
                       } else {
                         _logger.warning('Cannot publish position: MQTT client not connected');
@@ -89,7 +90,7 @@ class _PositionControlState extends State<PositionControl> {
                         // 'timestamp': DateTime.now().toIso8601String()
                       };
                       builder.addString(jsonEncode(message));
-                      widget.mqttClient.publishMessage('two_bot/control_topic', MqttQos.atMostOnce, builder.payload!);
+                      widget.mqttClient.publishMessage(kMqttTopicControlRequest, MqttQos.atMostOnce, builder.payload!);
                       _logger.fine('Published reset position command');
                     } else {
                       _logger.warning('Cannot reset position: MQTT client not connected');
@@ -341,7 +342,7 @@ class _PositionControlState extends State<PositionControl> {
       };
       builder.addString(jsonEncode(message));
       widget.mqttClient.publishMessage(
-        'two_bot/control_topic',
+        kMqttTopicControlRequest,
         MqttQos.atLeastOnce,
         builder.payload!,
       );

@@ -3,12 +3,17 @@ import 'package:provider/provider.dart';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:logging/logging.dart';
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert'; // Import dart:convert for json.decode
 import 'models/robot_state.dart';
 import 'services/tcp_client.dart';
 import 'widgets/parameter_display.dart';
 import 'widgets/position_control.dart';
+
+// MQTT Topics
+const String kMqttTopicStatusRequest = 'two_bot/status_request';
+const String kMqttTopicStatusResponse = 'two_bot/status_response';
+const String kMqttTopicControlRequest = 'two_bot/control_request';
 
 void main() {
   // Set up logging
@@ -64,13 +69,13 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  static const String mqttServerIp = '192.168.1.167'; // Update this to your robot's IP address
-  late RobotState robotState;
-  late TcpClient tcpClient;
-  late MqttServerClient mqttClient;
+  static const String _mqttServerIp = '192.168.1.167'; // Update this to your robot's IP address
+  late RobotState _robotState;
+  late TcpClient _tcpClient;
+  late MqttServerClient _mqttClient;
   final _logger = Logger('DashboardScreen');
-  bool _mqttConnected = false;
-  bool _robotRunning = false;
+  bool _isMqttConnected = false;
+  bool _isRobotRunning = false;
   Timer? _connectionCheckTimer;
   Timer? _statusCheckTimer;
   Timer? _statusTimeoutTimer;
@@ -78,22 +83,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    robotState = context.read<RobotState>();
-    tcpClient = TcpClient(robotState);
+    _robotState = context.read<RobotState>();
+    _tcpClient = TcpClient(_robotState);
     _setupMqttClient();
     
     // Start periodic connection check
     _connectionCheckTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (mounted && mqttClient.connectionStatus?.state != MqttConnectionState.connected) {
+      if (mounted && _mqttClient.connectionStatus?.state != MqttConnectionState.connected) {
         setState(() {
-          _mqttConnected = false;
+          _isMqttConnected = false;
         });
       }
     });
 
     // Start periodic status check
     _statusCheckTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      if (mounted && _mqttConnected) {
+      if (mounted && _isMqttConnected) {
         _requestRobotStatus();
       }
     });
@@ -101,9 +106,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _requestRobotStatus() {
     final builder = MqttClientPayloadBuilder();
-    builder.addString('status_request');
-    mqttClient.publishMessage(
-      'two_bot/status',
+    builder.addString('status');
+    _mqttClient.publishMessage(
+      kMqttTopicStatusRequest,
       MqttQos.atMostOnce,
       builder.payload!,
     );
@@ -115,38 +120,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _statusTimeoutTimer = Timer(const Duration(seconds: 1), () {
       if (mounted) {
         setState(() {
-          _robotRunning = false;  // Set to stopped if no response received
+          _isRobotRunning = false;  // Set to stopped if no response received
         });
+        // Set battery voltage to 0 when no response
+        _robotState.updateFromJson({'Vb': 0.0});
       }
     });
   }
 
   Future<void> _setupMqttClient() async {
-    mqttClient = MqttServerClient(mqttServerIp, 'two_bot_client_${DateTime.now().millisecondsSinceEpoch}');
-    mqttClient.port = 1883;
-    mqttClient.keepAlivePeriod = 20; // Reduced keep-alive period for faster detection
-    mqttClient.logging(on: true);
-    mqttClient.autoReconnect = true;
-    mqttClient.resubscribeOnAutoReconnect = true;
-    mqttClient.secure = false;
-    mqttClient.onDisconnected = _onDisconnected;
-    mqttClient.onConnected = _onConnected;
-    mqttClient.onAutoReconnect = () {
+    _mqttClient = MqttServerClient(_mqttServerIp, 'two_bot_client_${DateTime.now().millisecondsSinceEpoch}');
+    _mqttClient.port = 1883;
+    _mqttClient.keepAlivePeriod = 20; // Reduced keep-alive period for faster detection
+    _mqttClient.logging(on: true);
+    _mqttClient.autoReconnect = true;
+    _mqttClient.resubscribeOnAutoReconnect = true;
+    _mqttClient.secure = false;
+    _mqttClient.onDisconnected = _onDisconnected;
+    _mqttClient.onConnected = _onConnected;
+    _mqttClient.onAutoReconnect = () {
       _logger.info('Auto reconnect triggered');
       setState(() {
-        _mqttConnected = false;
+        _isMqttConnected = false;
       });
     };
-    mqttClient.onAutoReconnected = () {
+    _mqttClient.onAutoReconnected = () {
       _logger.info('Auto reconnected successfully');
       setState(() {
-        _mqttConnected = true;
+        _isMqttConnected = true;
       });
     };
-    mqttClient.pongCallback = () {
+    _mqttClient.pongCallback = () {
       _logger.fine('Ping response received');
       setState(() {
-        _mqttConnected = true;
+        _isMqttConnected = true;
       });
     };
 
@@ -156,26 +163,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .startClean()
         .withWillQos(MqttQos.atLeastOnce)
         .withWillRetain()
-        .withWillTopic('two_bot/status')
+        .withWillTopic(kMqttTopicStatusRequest)
         .withWillMessage('offline');
-    mqttClient.connectionMessage = connMessage;
+    _mqttClient.connectionMessage = connMessage;
 
     try {
-      _logger.info('Attempting to connect to MQTT broker at $mqttServerIp:${mqttClient.port}');
-      _logger.info('Connection settings: keepAlive=${mqttClient.keepAlivePeriod}, autoReconnect=${mqttClient.autoReconnect}');
+      _logger.info('Attempting to connect to MQTT broker at $_mqttServerIp:${_mqttClient.port}');
+      _logger.info('Connection settings: keepAlive=${_mqttClient.keepAlivePeriod}, autoReconnect=${_mqttClient.autoReconnect}');
       
-      await mqttClient.connect();
+      await _mqttClient.connect();
       
-      if (mqttClient.connectionStatus?.state == MqttConnectionState.connected) {
+      if (_mqttClient.connectionStatus?.state == MqttConnectionState.connected) {
         _logger.info('Successfully connected to MQTT broker');
-        _logger.info('Client state: ${mqttClient.connectionStatus}');
+        _logger.info('Client state: ${_mqttClient.connectionStatus}');
         setState(() {
-          _mqttConnected = true;
+          _isMqttConnected = true;
         });
       } else {
-        _logger.severe('Failed to connect. Status: ${mqttClient.connectionStatus?.state}');
+        _logger.severe('Failed to connect. Status: ${_mqttClient.connectionStatus?.state}');
         setState(() {
-          _mqttConnected = false;
+          _isMqttConnected = false;
         });
       }
     } catch (e) {
@@ -194,49 +201,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _connectClient() async {
     try {
       _logger.info('MQTT Connecting...');
-      await mqttClient.connect();
-      if (mqttClient.connectionStatus?.state == MqttConnectionState.connected) {
+      await _mqttClient.connect();
+      if (_mqttClient.connectionStatus?.state == MqttConnectionState.connected) {
         _logger.info('MQTT client connected successfully');
-        // Subscribe to the data topic
-        const topic = 'two_bot/data';
-        mqttClient.subscribe(topic, MqttQos.atMostOnce);
-        _logger.info('Subscribed to topic: $topic');
-        
-        // Set up message handler
-        mqttClient.updates!.listen((List<MqttReceivedMessage<MqttMessage>> c) {
-          final MqttPublishMessage message = c[0].payload as MqttPublishMessage;
-          final payload = MqttPublishPayload.bytesToStringAsString(message.payload.message);
-          
-          try {
-            final Map<String, dynamic> data = json.decode(payload);
-            if (data.containsKey('state')) {
-              robotState.updateFromJson(data['state']);
-            } else {
-              _logger.warning('Received message without state data: $payload');
-            }
-          } catch (e) {
-            _logger.severe('Error parsing MQTT message: $e');
-          }
+        setState(() {
+          _isMqttConnected = true;
         });
-      } else {
-        final status = mqttClient.connectionStatus;
-        _logger.severe(
-          'MQTT client connection failed - status is ${status?.state}. '
-          'Return code: ${status?.returnCode}. '
-          'Message: ${status?.returnCode?.toString() ?? "Unknown"}'
-        );
-        mqttClient.disconnect();
       }
-    } catch (e, stackTrace) {
-      _logger.severe('Failed to connect to MQTT broker: $e', e, stackTrace);
-      mqttClient.disconnect();
+    } catch (e) {
+      _logger.severe('Error connecting to MQTT broker: $e');
+      setState(() {
+        _isMqttConnected = false;
+      });
     }
   }
 
   void _onDisconnected() {
     _logger.info('MQTT client disconnected');
     setState(() {
-      _mqttConnected = false;
+      _isMqttConnected = false;
     });
     // Try to reconnect after a delay
     Future.delayed(const Duration(seconds: 5), () {
@@ -250,27 +233,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _onConnected() {
     _logger.info('MQTT client connected callback');
     setState(() {
-      _mqttConnected = true;
+      _isMqttConnected = true;
     });
 
     // Subscribe to response topic
-    const statusTopic = 'two_bot/response';
-    mqttClient.subscribe(statusTopic, MqttQos.atMostOnce);
+    _mqttClient.subscribe(kMqttTopicStatusResponse, MqttQos.atMostOnce);
 
     // Set up message handler for status updates
-    mqttClient.updates!.listen((List<MqttReceivedMessage<MqttMessage>> c) {
+    _mqttClient.updates!.listen((List<MqttReceivedMessage<MqttMessage>> c) {
       final MqttPublishMessage message = c[0].payload as MqttPublishMessage;
       final payload = MqttPublishPayload.bytesToStringAsString(message.payload.message);
       
-      if (c[0].topic == 'two_bot/response') {
+      if (c[0].topic == kMqttTopicStatusResponse) {
         // Cancel the timeout timer since we received a response
         _statusTimeoutTimer?.cancel();
         
-        final status = int.tryParse(payload);
-        if (status != null) {
+        try {
+          final double value = double.parse(payload);
+          final bool isRunning = value > 0;
+          final double batteryVoltage = isRunning ? value : 0.0;
+          
+          // Update robot state with battery voltage
+          _robotState.updateFromJson({'Vb': batteryVoltage});
+          
           setState(() {
-            _robotRunning = status != 0;  // 0 is stopped, any other value is running
+            _isRobotRunning = isRunning;
           });
+        } catch (e) {
+          _logger.warning('Failed to parse status response: $e');
         }
       }
     });
@@ -281,8 +271,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _connectionCheckTimer?.cancel();
     _statusCheckTimer?.cancel();
     _statusTimeoutTimer?.cancel();
-    tcpClient.disconnect();
-    mqttClient.disconnect();
+    _tcpClient.disconnect();
+    _mqttClient.disconnect();
     super.dispose();
   }
 
@@ -299,19 +289,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Icon(
                   Icons.circle,
-                  color: _mqttConnected ? Colors.green : Colors.red,
+                  color: _isMqttConnected ? const Color.fromARGB(255, 0, 255, 8) : const Color.fromARGB(255, 255, 17, 0),
                   size: 12,
                 ),
                 const SizedBox(width: 8),
-                Text(_mqttConnected ? 'Connected' : 'Disconnected'),
+                Text(_isMqttConnected ? 'Connected' : 'Disconnected'),
                 const SizedBox(width: 16),
                 Icon(
-                  Icons.play_circle,
-                  color: _robotRunning ? Colors.green : Colors.grey,
+                  Icons.circle,
+                  color: _isRobotRunning ? const Color.fromARGB(255, 0, 255, 8) : const Color.fromARGB(255, 255, 0, 0),
                   size: 12,
                 ),
                 const SizedBox(width: 8),
-                Text(_robotRunning ? 'Running' : 'Stopped'),
+                Text(_isRobotRunning ? 'Running' : 'Stopped'),
                 const SizedBox(width: 16),
               ],
             ),
@@ -322,7 +312,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: PositionControl(mqttClient: mqttClient),
+            child: PositionControl(mqttClient: _mqttClient),
           ),
           Expanded(
             child: Padding(
@@ -330,7 +320,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: ParameterDisplay(mqttClient: mqttClient),
+                  child: ParameterDisplay(mqttClient: _mqttClient),
                 ),
               ),
             ),
