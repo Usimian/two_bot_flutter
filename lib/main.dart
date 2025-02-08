@@ -4,10 +4,7 @@ import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:logging/logging.dart';
 import 'dart:async';
-import 'dart:convert'; // Import dart:convert for json.decode
 import 'models/robot_state.dart';
-import 'services/tcp_client.dart';
-import 'widgets/parameter_display.dart';
 import 'widgets/position_control.dart';
 
 // MQTT Topics
@@ -71,7 +68,6 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   static const String _mqttServerIp = '192.168.1.167'; // Update this to your robot's IP address
   late RobotState _robotState;
-  late TcpClient _tcpClient;
   late MqttServerClient _mqttClient;
   final _logger = Logger('DashboardScreen');
   bool _isMqttConnected = false;
@@ -84,7 +80,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _robotState = context.read<RobotState>();
-    _tcpClient = TcpClient(_robotState);
     _setupMqttClient();
     
     // Start periodic connection check
@@ -271,7 +266,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _connectionCheckTimer?.cancel();
     _statusCheckTimer?.cancel();
     _statusTimeoutTimer?.cancel();
-    _tcpClient.disconnect();
     _mqttClient.disconnect();
     super.dispose();
   }
@@ -311,19 +305,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.all(16.0),
             child: PositionControl(mqttClient: _mqttClient),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: ParameterDisplay(mqttClient: _mqttClient),
-                ),
-              ),
-            ),
           ),
         ],
       ),

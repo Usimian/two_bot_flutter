@@ -15,24 +15,18 @@ class ParameterDisplay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<RobotState>(
       builder: (context, robotState, child) {
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            // Adjust grid columns based on width
-            int crossAxisCount = constraints.maxWidth < 600 ? 2 : 3;
-            
-            return GridView.count(
-              crossAxisCount: crossAxisCount,
-              childAspectRatio: 5.0,
-              shrinkWrap: true,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              children: [
-                _buildParameterTile(context, 'Rp', robotState.rp),
-                _buildParameterTile(context, 'Ri', robotState.ri),
-                _buildParameterTile(context, 'Rd', robotState.rd),
-              ],
-            );
-          }
+        return SizedBox(
+          width: 120, // Fixed width for the column
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildParameterTile(context, 'Rp', robotState.rp),
+              const SizedBox(height: 8),
+              _buildParameterTile(context, 'Ri', robotState.ri),
+              const SizedBox(height: 8),
+              _buildParameterTile(context, 'Rd', robotState.rd),
+            ],
+          ),
         );
       },
     );

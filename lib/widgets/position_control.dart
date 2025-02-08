@@ -136,6 +136,26 @@ class _PositionControlState extends State<PositionControl> {
                           const SizedBox(height: 16),
                           Row(
                             children: [
+                              // R Values Column
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey[400]!),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    _buildRValueDisplay("Rp", robotState.rp),
+                                    const SizedBox(height: 40),
+                                    _buildRValueDisplay("Ri", robotState.ri),
+                                    const SizedBox(height: 40),
+                                    _buildRValueDisplay("Rd", robotState.rd),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              // PID Sliders
                               Expanded(
                                 child: Column(
                                   children: [
@@ -220,6 +240,26 @@ class _PositionControlState extends State<PositionControl> {
                         const SizedBox(height: 16),
                         Row(
                           children: [
+                            // R Values Column
+                            Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey[400]!),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    _buildRValueDisplay("Rp", robotState.rp),
+                                    const SizedBox(height: 40),
+                                    _buildRValueDisplay("Ri", robotState.ri),
+                                    const SizedBox(height: 40),
+                                    _buildRValueDisplay("Rd", robotState.rd),
+                                  ],
+                                ),
+                              ),
+                            const SizedBox(width: 16),
+                            // PID Sliders
                             Expanded(
                               child: Column(
                                 children: [
@@ -325,6 +365,36 @@ class _PositionControlState extends State<PositionControl> {
             child: Text(
               value.toStringAsFixed(2),
               style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRValueDisplay(String label, double value) {
+    return Container(
+      width: 100,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label, 
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            )
+          ),
+          Text(
+            value.toStringAsFixed(2),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
             ),
           ),
         ],
