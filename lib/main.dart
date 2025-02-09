@@ -4,6 +4,7 @@ import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:logging/logging.dart';
 import 'dart:async';
+import 'dart:convert'; // Import the dart:convert library
 import 'models/robot_state.dart';
 import 'widgets/position_control.dart';
 
@@ -244,15 +245,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _statusTimeoutTimer?.cancel();
         
         try {
-          final double value = double.parse(payload);
-          final bool isRunning = value > 0;
-          final double batteryVoltage = isRunning ? value : 0.0;
-          
-          // Update robot state with battery voltage
-          _robotState.updateFromJson({'Vb': batteryVoltage});
+          final Map<String, dynamic> jsonResponse = jsonDecode(payload);
+          final double batteryVoltage = jsonResponse['Vb']?.toDouble() ?? 0.0;
+          final bool isRunning = batteryVoltage > 0;
           
           setState(() {
             _isRobotRunning = isRunning;
+          });
+          
+          // Update robot state with all parameters from the response
+          _robotState.updateFromJson({
+            'Vb': batteryVoltage,
+            'Rp': jsonResponse['Rp']?.toDouble() ?? _robotState.rp,
+            'Ri': jsonResponse['Ri']?.toDouble() ?? _robotState.ri,
+            'Rd': jsonResponse['Rd']?.toDouble() ?? _robotState.rd,
           });
         } catch (e) {
           _logger.warning('Failed to parse status response: $e');
