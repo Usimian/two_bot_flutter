@@ -105,7 +105,13 @@ class _PositionControlState extends State<PositionControl> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: robotState.vb < 10.0 ? Colors.red : Colors.green,
+                    color: robotState.vb > 0  // Robot is running
+                        ? (robotState.adcStatus 
+                            ? const Color.fromARGB(255, 0, 0, 255)  // Blue when running and ADC is mocked
+                            : robotState.vb < 10.0 
+                                ? Colors.red   // Red when running but low battery
+                                : Colors.green)  // Green when running and good battery
+                        : Colors.red,  // Red when not running
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: FittedBox(
@@ -373,32 +379,44 @@ class _PositionControlState extends State<PositionControl> {
   }
 
   Widget _buildRValueDisplay(String label, double value) {
-    return Container(
-      width: 100,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label, 
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            )
+    return Consumer<RobotState>(
+      builder: (context, robotState, child) {
+        final textColor = robotState.vb <= 0 
+            ? Colors.red  // Red when not running
+            : robotState.adcStatus 
+                ? const Color.fromARGB(255, 0, 0, 255)  // Blue when running and ADC is mocked
+                : Colors.black;  // Default color when running and ADC not mocked
+            
+        return Container(
+          width: 100,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(4),
           ),
-          Text(
-            value.toStringAsFixed(2),
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label, 
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: textColor,
+                )
+              ),
+              Text(
+                value.toStringAsFixed(2),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: textColor,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      }
     );
   }
 

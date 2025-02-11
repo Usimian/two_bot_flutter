@@ -254,12 +254,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           });
           
           // Update robot state with all parameters from the response
-          _robotState.updateFromJson({
-            'Vb': batteryVoltage,
-            'Rp': jsonResponse['Rp']?.toDouble() ?? _robotState.rp,
-            'Ri': jsonResponse['Ri']?.toDouble() ?? _robotState.ri,
-            'Rd': jsonResponse['Rd']?.toDouble() ?? _robotState.rd,
-          });
+          _robotState.updateFromJson(jsonResponse);
         } catch (e) {
           _logger.warning('Failed to parse status response: $e');
         }
@@ -287,20 +282,93 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
+                // GPIO Status
                 Icon(
-                  Icons.circle,
-                  color: _isMqttConnected ? const Color.fromARGB(255, 0, 255, 8) : const Color.fromARGB(255, 255, 17, 0),
-                  size: 12,
+                  Icons.car_repair,
+                  color: !_isRobotRunning 
+                      ? const Color.fromARGB(255, 255, 0, 0)  // Red when not running
+                      : context.watch<RobotState>().gpioStatus 
+                          ? const Color.fromARGB(255, 0, 0, 255)  // Yellow when running and true
+                          : const Color.fromARGB(255, 0, 255, 8),  // Green when running and false
+                  size: 24,
                 ),
+                const SizedBox(width: 4),
+                const Text('GPIO'),
                 const SizedBox(width: 8),
+                
+                // I2C Status
+                Icon(
+                  Icons.cable,
+                  color: !_isRobotRunning 
+                      ? const Color.fromARGB(255, 255, 0, 0)
+                      : context.watch<RobotState>().i2cStatus 
+                          ? const Color.fromARGB(255, 0, 0, 255)
+                          : const Color.fromARGB(255, 0, 255, 8),
+                  size: 24,
+                ),
+                const SizedBox(width: 4),
+                const Text('I2C'),
+                const SizedBox(width: 8),
+                
+                // IMU Status
+                Icon(
+                  Icons.arrow_circle_down,
+                  color: !_isRobotRunning 
+                      ? const Color.fromARGB(255, 255, 0, 0)
+                      : context.watch<RobotState>().imuStatus 
+                          ? const Color.fromARGB(255, 0, 0, 255)
+                          : const Color.fromARGB(255, 0, 255, 8),
+                  size: 24,
+                ),
+                const SizedBox(width: 4),
+                const Text('IMU'),
+                const SizedBox(width: 8),
+                
+                // ADC Status
+                Icon(
+                  Icons.analytics,
+                  color: !_isRobotRunning 
+                      ? const Color.fromARGB(255, 255, 0, 0)
+                      : context.watch<RobotState>().adcStatus 
+                          ? const Color.fromARGB(255, 0, 0, 255)
+                          : const Color.fromARGB(255, 0, 255, 8),
+                  size: 24,
+                ),
+                const SizedBox(width: 4),
+                const Text('ADC'),
+                const SizedBox(width: 8),
+                
+                // OLED Status
+                Icon(
+                  Icons.display_settings,
+                  color: !_isRobotRunning 
+                      ? const Color.fromARGB(255, 255, 0, 0)
+                      : context.watch<RobotState>().oledStatus 
+                          ? const Color.fromARGB(255, 0, 0, 255)
+                          : const Color.fromARGB(255, 0, 255, 8),
+                  size: 24,
+                ),
+                const SizedBox(width: 4),
+                const Text('OLED'),
+                const SizedBox(width: 16),
+                
+                // Connection Status
+                Icon(
+                  Icons.connect_without_contact,
+                  color: _isMqttConnected ? const Color.fromARGB(255, 0, 255, 8) : const Color.fromARGB(255, 255, 17, 0),
+                  size: 24,
+                ),
+                const SizedBox(width: 4),
                 Text(_isMqttConnected ? 'Connected' : 'Disconnected'),
                 const SizedBox(width: 16),
+                
+                // Robot Running Status
                 Icon(
-                  Icons.circle,
+                  Icons.run_circle,
                   color: _isRobotRunning ? const Color.fromARGB(255, 0, 255, 8) : const Color.fromARGB(255, 255, 0, 0),
-                  size: 12,
+                  size: 24,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 Text(_isRobotRunning ? 'Running' : 'Stopped'),
                 const SizedBox(width: 16),
               ],
